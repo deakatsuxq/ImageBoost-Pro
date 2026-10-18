@@ -71,6 +71,17 @@ def test_large_image_reports_original_resolution_and_bounded_analysis_scale():
     assert report.metrics["analysis_scale"] == 0.5
 
 
+def test_large_photo_preserves_native_noise_and_sharpness_measurements():
+    rng = np.random.default_rng(704)
+    noisy = _rgb(np.clip(128 + rng.normal(0, 12, (2048, 2048)), 0, 255).astype(np.uint8))
+    large = analyze_image(noisy)
+    native = analyze_image(noisy[768:1280, 768:1280])
+    assert 0.9 < large.metrics["noise_sigma"] / native.metrics["noise_sigma"] < 1.1
+    assert 0.9 < large.metrics["sharpness"] / native.metrics["sharpness"] < 1.1
+    assert large.metrics["analysis_scale"] == 1600 / 2048
+    assert "в исходном масштабе" in large.to_text()
+
+
 def test_single_pixel_has_finite_measurements():
     report = analyze_image(np.array([[[0, 0, 0]]], dtype=np.uint8))
     assert all(np.isfinite(value) for value in report.metrics.values())

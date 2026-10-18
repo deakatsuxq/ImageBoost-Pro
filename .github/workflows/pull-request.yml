@@ -1,0 +1,36 @@
+name: Open implementation pull request
+
+on:
+  push:
+    branches: ["feat/imageboost-pro"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  pull-request:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create or update the requested pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          IMPLEMENTATION_BRANCH: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$IMPLEMENTATION_BRANCH" = "main" ]; then
+            echo '::error::Select the implementation branch, not main.'
+            exit 1
+          fi
+          existing=$(gh pr list --base main --head "$IMPLEMENTATION_BRANCH" --state open --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh pr edit "$existing" --title 'ImageBoost Pro: редактор и проверенная Windows-сборка' --body-file docs/PULL_REQUEST.md
+            gh pr view "$existing" --json url --jq .url >> "$GITHUB_STEP_SUMMARY"
+          else
+            gh pr create --base main --head "$IMPLEMENTATION_BRANCH" --title 'ImageBoost Pro: редактор и проверенная Windows-сборка' --body-file docs/PULL_REQUEST.md | tee -a "$GITHUB_STEP_SUMMARY"
+          fi

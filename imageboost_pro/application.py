@@ -105,11 +105,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--smoke-output", type=Path, default=Path("smoke-result.json"))
     args = parser.parse_args(argv)
     import cv2
-    from PySide6.QtCore import QLibraryInfo, QLocale, QThreadPool, QTranslator
+    from PySide6.QtCore import QLibraryInfo, QLocale, QThreadPool, QTranslator, Qt
     from PySide6.QtGui import QIcon
     from PySide6.QtWidgets import QApplication
     from imageboost_pro.ui.main_window import MainWindow
 
+    QApplication.setAttribute(Qt.ApplicationAttribute.AA_DontUseNativeDialogs, True)
     app = QApplication([sys.argv[0]])
     app.setOrganizationName("ImageBoostPro")
     app.setApplicationName("ImageBoost Pro")

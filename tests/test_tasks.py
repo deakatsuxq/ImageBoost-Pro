@@ -2,7 +2,16 @@ from threading import Event
 
 from PySide6.QtCore import QThreadPool
 
-from imageboost_pro.workers.tasks import TaskRunner
+from imageboost_pro.workers.tasks import TaskRunner, submit
+
+
+def test_submit_connects_before_fast_job_starts(qtbot):
+    results = []
+    task = submit(lambda update, cancelled: "результат")
+    task.signals.result.connect(results.append)
+    with qtbot.waitSignal(task.signals.finished, timeout=3000):
+        pass
+    assert results == ["результат"]
 
 
 def test_background_task_progress_result_and_error(qtbot):

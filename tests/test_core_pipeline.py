@@ -188,6 +188,34 @@ def test_ai_missing_model_explicit_error(image):
         process_image(image, ProcessingSettings(upscaler="realesrgan"))
 
 
+def test_memory_guard_runs_before_processing(image, monkeypatch):
+    monkeypatch.setattr("imageboost_pro.core.pipeline.available_memory_bytes", lambda: 1_000)
+    with pytest.raises(MemoryError, match="памяти"):
+        process_image(image, ProcessingSettings(scale=8))
+
+
+def test_nlm_cancelled_between_tiles():
+    from imageboost_pro.core.denoising import _colored_nlm
+    source = np.full((16, 520, 3), 100, dtype=np.uint8)
+    calls = []
+    def cancelled():
+        calls.append(1)
+        return len(calls) == 2
+    with pytest.raises(ProcessingCancelled):
+        _colored_nlm(source, 5, 5, cancelled)
+    assert len(calls) == 2
+
+
+def test_zero_luma_chroma_is_identity(image):
+    np.testing.assert_array_equal(denoise_image(image, strength=80, luma=0, chroma=0), image)
+
+
+def test_deconvolution_does_not_invent_black_frame():
+    source = np.full((64, 64, 3), 128, dtype=np.uint8)
+    output = deconvolve_image(source, strength=100)
+    assert np.max(np.abs(output.astype(float) - source)) <= 1
+
+
 def test_all_stages_pipeline_rgb_shape_and_monotonic_progress(image):
     original = image.copy()
     progress = []
