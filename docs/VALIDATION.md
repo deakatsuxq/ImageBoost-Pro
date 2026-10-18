@@ -5,8 +5,8 @@
 
 ## Windows
 
-Первый успешный Windows-дистрибутив: коммит `3d2adb8`, запуск
-[39145569090](https://github.com/deakatsuxq/ImageBoost-Pro/actions/runs/39145569090).
+Финальный Windows-дистрибутив с ретушью и расширенными проверками: коммит `9b69695`, запуск
+[39146445334](https://github.com/deakatsuxq/ImageBoost-Pro/actions/runs/39146445334).
 GitHub сообщает `success`; опубликованы **ImageBoostPro-Windows** (около 145 МБ)
 и **ImageBoostPro-Windows-checks**.
 
@@ -14,20 +14,23 @@ GitHub сообщает `success`; опубликованы **ImageBoostPro-Wind
 запуск `ImageBoostPro.exe` с настоящим Windows-плагином Qt, ZIP-упаковку,
 распаковку и повторный запуск EXE из распакованной папки. При ненулевом коде,
 отсутствии JSON или `status != ok` загрузка Windows-дистрибутива не выполняется.
-В checks сохраняются отчёты и снимки окна. Отсутствие Python на целевой машине
+В checks сохраняются отчёты и снимки основного окна и ретуши. Расширенный smoke
+внутри EXE выполняет Wavelet, Richardson–Lucy, экспорт JPEG/WebP/TIFF/BMP и настоящую
+ретушь повреждения. GitHub показывает длительность успешного workflow 2 мин 11 с.
+Отсутствие необходимости устанавливать Python на целевой машине
 обеспечивается поставкой интерпретатора и библиотек внутри `_internal`.
 
 Это автоматическая проверка на `windows-latest`, а не ручной запуск на каждой
 версии Windows 10/11 и каждом масштабе DPI. EXE не подписан цифровым сертификатом.
-Новые изменения ретуши/расширенного smoke проверяются в следующем запуске;
-перед скачиванием выбирайте успешный запуск нужного коммита.
+Повторные запуски выбирайте по нужному коммиту. Документационные изменения после
+`9b69695` не меняют код проверенного приложения.
 
 ## Linux и исходное приложение
 
 - Python 3.12.14 / PySide6 6.8.3 / OpenCV 4.11 / NumPy 2.2.6 / PyTorch 2.7.1 CPU:
   `python -m pytest -q` — **155 passed**.
-- Чистое окружение Python 3.11.17 без PyTorch проверено отдельно. Нейросетевые
-  тесты, которым нужен Torch, отмечаются как skipped; это не выполненные проверки AI.
+- Чистое окружение Python 3.11.17 без PyTorch: **145 passed, 10 skipped**.
+  Нейросетевые тесты, которым нужен Torch, отмечены как skipped; это не выполненные проверки AI.
 - `ruff check .` — ошибок нет; `pip check` / `uv pip check` — конфликтов нет.
 - Запуск `main.py --smoke-test` на Python 3.11 и 3.12 создаёт настоящее окно Qt,
   загружает PNG с кириллицей, анализирует тёмный снимок, выполняет ночную обработку
@@ -36,9 +39,9 @@ GitHub сообщает `success`; опубликованы **ImageBoostPro-Wind
   оригинала, удаляет царапину настоящим OpenCV Inpainting. Результат — `status: ok`.
 - Linux PyInstaller onedir собран, запущен и проверен функциональным smoke.
   Это отдельный Linux-бинарник; он не выдаётся за Windows EXE.
-- Первый Linux CI завершился с exit 3 при инициализации Qt/pytest. Добавлены
+- Первый Linux CI завершился с exit 3 на этапе pytest. Добавлены
   системные зависимости Qt и предварительная проверка импорта/отрисовки.
-  Исправленный CI [39146071918](https://github.com/deakatsuxq/ImageBoost-Pro/actions/runs/39146071918)
+  Финальный CI [39146445325](https://github.com/deakatsuxq/ImageBoost-Pro/actions/runs/39146445325)
   завершился успешно. Подробности первого stderr недоступны без входа в GitHub;
   точное имя отсутствовавшей библиотеки не заявляется установленным фактом.
 
@@ -85,5 +88,14 @@ GFPGAN и BM3D отсутствуют и не показываются как р
 из этой машины отвечает `403 Forbidden`, в том числе `gh pr create` к GraphQL.
 Для запрошенного PR добавлен отдельный идемпотентный Actions workflow, который
 использует стандартный `GITHUB_TOKEN` с `pull-requests: write`; доступность этой
-операции дополнительно зависит от настроек репозитория. Неподтверждённый PR
-не считается созданным.
+операции дополнительно зависит от настроек репозитория.
+
+Попытка [39146445337](https://github.com/deakatsuxq/ImageBoost-Pro/actions/runs/39146445337)
+подтвердила точный отказ: `GitHub Actions is not permitted to create or approve pull requests (createPullRequest)`.
+**PR не создан.** Владелец может открыть
+[Settings → Actions → General](https://github.com/deakatsuxq/ImageBoost-Pro/settings/actions),
+в разделе Workflow permissions включить **Allow GitHub Actions to create and approve pull requests**,
+сохранить настройку и повторить этот неудавшийся запуск (**Re-run all jobs**).
+Альтернатива — вручную открыть [PR из готовой ветки](https://github.com/deakatsuxq/ImageBoost-Pro/compare/main...feat/imageboost-pro?expand=1)
+с текстом [PULL_REQUEST.md](PULL_REQUEST.md). Ошибка разрешений PR не препятствует скачиванию
+успешно собранного Windows-дистрибутива.
