@@ -27,7 +27,8 @@ class AnalysisReport:
     brightness, contrast and noise are in 8-bit luminance levels. Sharpness is
     Laplacian variance, entropy is bits/pixel, and JPEG grid strength is the
     excess luminance discontinuity at eight-pixel boundaries. Width and height
-    describe the original, not the analysis preview.
+    describe the original, not the analysis preview. Noise and sharpness use an
+    unscaled central crop; global statistics use the bounded analysis preview.
     """
 
     metrics: dict[str, float]
@@ -48,6 +49,8 @@ class AnalysisReport:
             f"Возможный цветовой сдвиг: {m['color_cast']:.1f}%",
             f"Выраженность сетки JPEG: {m['jpeg_grid_strength']:.2f}",
             f"Энтропия яркости: {m['entropy']:.2f} бит/пиксель",
+            f"Масштаб общего анализа: {m['analysis_scale']:.1%}",
+            "Шум и резкость оценены по центральному участку в исходном масштабе (до 1600 × 1600).",
             "",
             "Наблюдения:",
         ]
@@ -133,10 +136,12 @@ def _jpeg_grid_strength(gray: np.ndarray) -> float:
 def analyze_image(rgb: np.ndarray) -> AnalysisReport:
     """Analyze an RGB uint8 array without modifying it.
 
-    Large photos are area-resampled to at most 1600 px per side for bounded
-    resource use. Noise/sharpness at this analysis scale cannot be compared
-    directly with full-resolution measurements. JPEG boundaries are measured on
-    an unscaled top-left crop, preserving the original eight-pixel grid.
+    Global statistics use a preview area-resampled to at most 1600 px per side.
+    Noise and sharpness use an unscaled central crop of at most 1600 × 1600 px,
+    preserving the original noise magnitude and spatial frequency. A crop can
+    miss defects elsewhere in a photograph, so these are representative local
+    estimates. JPEG boundaries use an unscaled top-left crop, preserving the
+    original eight-pixel grid. ``analysis_scale`` describes the global preview.
     """
     rgb = validate_rgb(rgb)
     height, width = rgb.shape[:2]
@@ -153,8 +158,12 @@ def analyze_image(rgb: np.ndarray) -> AnalysisReport:
     gray = gray8.astype(np.float32)
     brightness = float(gray.mean())
     contrast = float(gray.std())
-    noise = _noise_sigma(gray)
-    sharpness = float(cv2.Laplacian(gray, cv2.CV_32F).var())
+    sample_y = max(0, (height - 1600) // 2)
+    sample_x = max(0, (width - 1600) // 2)
+    sample = rgb[sample_y:sample_y + 1600, sample_x:sample_x + 1600]
+    sample_gray = cv2.cvtColor(sample, cv2.COLOR_RGB2GRAY).astype(np.float32)
+    noise = _noise_sigma(sample_gray)
+    sharpness = float(cv2.Laplacian(sample_gray, cv2.CV_32F).var())
     shadows = float(np.mean(gray8 <= 3))
     highlights = float(np.mean(gray8 >= 252))
     channel_means = preview.mean(axis=(0, 1), dtype=np.float64)
@@ -193,7 +202,7 @@ def analyze_image(rgb: np.ndarray) -> AnalysisReport:
         issues.append("Обнаружена заметная высокочастотная составляющая, похожая на шум.")
         recommendations.append("Примените шумоподавление перед повышением резкости.")
     if sharpness < 100 and contrast > 6:
-        issues.append("Невысокая резкость на масштабе анализа; возможна размытость.")
+        issues.append("Невысокая резкость центрального участка в исходном масштабе; возможна размытость.")
         recommendations.append("Попробуйте умеренную нерезкую маску; утраченную информацию нельзя восстановить точно.")
     if shadows > 0.03:
         issues.append(f"Почти чёрные пиксели: {shadows:.1%}; часть деталей в тенях могла быть потеряна.")

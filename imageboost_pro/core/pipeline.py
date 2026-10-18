@@ -10,6 +10,7 @@ from .sharpening import sharpen_image
 from .color_correction import correct_color
 from .night_recovery import recover_night
 from .artifact_removal import remove_jpeg_artifacts, reduce_banding, deconvolve_image
+from ._resources import available_memory_bytes
 
 
 class ProcessingCancelled(Exception):
@@ -98,6 +99,14 @@ def process_image(rgb, settings: ProcessingSettings,
         stages.append(("Резкость и детали", lambda image: sharpen_image(
             image, s.sharpen_method, s.sharpen_amount, s.sharpen_radius, s.sharpen_threshold,
             s.detail_amount, s.microcontrast, s.halo_protection)))
+    # Float colour transforms can keep several full-size arrays alive. This is a
+    # conservative estimate, not a promise of peak usage or a substitute for caps.
+    peak_pixels = max(rgb.shape[0] * rgb.shape[1], size[0] * size[1])
+    required_bytes = peak_pixels * (72 if stages else 3) + rgb.nbytes
+    available_bytes = available_memory_bytes()
+    if available_bytes is not None and required_bytes > available_bytes * 0.75:
+        raise MemoryError("Недостаточно свободной памяти для безопасной обработки. "
+                          "Уменьшите разрешение или закройте другие приложения.")
     image = rgb.copy()
     if progress:
         progress(0, "Подготовка")

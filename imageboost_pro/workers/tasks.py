@@ -4,7 +4,7 @@ from collections.abc import Callable
 import logging
 from threading import Event
 
-from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal, Slot
+from PySide6.QtCore import QObject, QRunnable, QThreadPool, QTimer, Signal, Slot
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +50,11 @@ class TaskRunner(QRunnable):
 
 
 def submit(fn: Callable, parent: QObject | None = None) -> TaskRunner:
+    """Queue from the GUI thread; allow subscribers to connect before starting.
+
+    Even an identity preview or cached model-status check can finish immediately.
+    Deferring its start by one event-loop turn avoids losing result/finished.
+    """
     task = TaskRunner(fn, parent)
-    QThreadPool.globalInstance().start(task)
+    QTimer.singleShot(0, lambda: QThreadPool.globalInstance().start(task))
     return task

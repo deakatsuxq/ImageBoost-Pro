@@ -13,7 +13,8 @@ def remove_jpeg_artifacts(rgb, strength=50):
     # JPEG block boundaries are every 8 pixels. Smooth a 2-pixel band while protecting
     # true edges with a bilateral filter; all other pixels remain untouched.
     height, width = rgb.shape[:2]
-    yy, xx = np.indices((height, width))
+    yy = np.arange(height)[:, None]
+    xx = np.arange(width)[None, :]
     grid = ((xx % 8 <= 1) | (xx % 8 == 7) | (yy % 8 <= 1) | (yy % 8 == 7))
     mix = grid[..., None].astype(np.float32) * strength / 100
     return uint8(rgb.astype(np.float32) + (smooth.astype(np.float32) - rgb) * mix)
@@ -41,7 +42,13 @@ def deconvolve_image(rgb, strength=50):
     light = lab[..., 0].astype(np.float32) / 255
     kernel = cv2.getGaussianKernel(5, 0.8 + strength / 150)
     psf = (kernel @ kernel.T).astype(np.float32)
-    restored = richardson_lucy(light, psf, num_iter=5 + int(strength / 10), clip=True)
+    iterations = 5 + int(strength / 10)
+    # Richardson–Lucy convolutions assume zero outside the input; reflect padding
+    # keeps that artificial black border outside the actual image for every pass.
+    padding = 2 * iterations + 2
+    extended = np.pad(light, padding, mode="reflect")
+    restored = richardson_lucy(extended, psf, num_iter=iterations, clip=True)
+    restored = restored[padding:-padding, padding:-padding]
     # Suppress extreme ringing with a local source-derived envelope.
     lower = cv2.erode(light, np.ones((3, 3), np.uint8)) - 0.04
     upper = cv2.dilate(light, np.ones((3, 3), np.uint8)) + 0.04
