@@ -9,6 +9,10 @@ permissions:
   contents: read
   pull-requests: write
 
+concurrency:
+  group: implementation-pull-request-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   pull-request:
     runs-on: ubuntu-latest
@@ -23,14 +27,45 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          run_gh() {
+            local error_file status
+            error_file=$(mktemp)
+            if gh "$@" 2>"$error_file"; then
+              rm -f "$error_file"
+              return 0
+            else
+              status=$?
+              python3 - "$error_file" "$1 $2" "$status" <<'PY'
+          from pathlib import Path
+          import os
+          import re
+          import sys
+
+          message = Path(sys.argv[1]).read_text(encoding='utf-8', errors='replace').strip()
+          message = message or f'Command exited with code {sys.argv[3]} without stderr.'
+          for name in ('GH_TOKEN', 'GITHUB_TOKEN'):
+              secret = os.environ.get(name)
+              if secret:
+                  message = message.replace(secret, '[REDACTED]')
+          message = re.sub(r'github_pat_[A-Za-z0-9_]+|gh[pousr]_[A-Za-z0-9_]+', '[REDACTED]', message)
+          message = re.sub(r'(?i)(authorization\s*:\s*(?:bearer|token)\s+)\S+', r'\1[REDACTED]', message)
+          message = f'gh {sys.argv[2]} failed (exit {sys.argv[3]}): {message}'
+          message = message.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+          # stderr remains visible when stdout is captured by existing=$(run_gh ...).
+          print(f'::error title=Pull request command failed::{message}', file=sys.stderr)
+          PY
+              rm -f "$error_file"
+              return "$status"
+            fi
+          }
           if [ "$IMPLEMENTATION_BRANCH" = "main" ]; then
             echo '::error::Select the implementation branch, not main.'
             exit 1
           fi
-          existing=$(gh pr list --base main --head "$IMPLEMENTATION_BRANCH" --state open --json number --jq '.[0].number // empty')
+          existing=$(run_gh pr list --base main --head "$IMPLEMENTATION_BRANCH" --state open --json number --jq '.[0].number // empty')
           if [ -n "$existing" ]; then
-            gh pr edit "$existing" --title 'ImageBoost Pro: редактор и проверенная Windows-сборка' --body-file docs/PULL_REQUEST.md
-            gh pr view "$existing" --json url --jq .url >> "$GITHUB_STEP_SUMMARY"
+            run_gh pr edit "$existing" --title 'ImageBoost Pro: редактор и проверенная Windows-сборка' --body-file docs/PULL_REQUEST.md
+            run_gh pr view "$existing" --json url --jq .url >> "$GITHUB_STEP_SUMMARY"
           else
-            gh pr create --base main --head "$IMPLEMENTATION_BRANCH" --title 'ImageBoost Pro: редактор и проверенная Windows-сборка' --body-file docs/PULL_REQUEST.md | tee -a "$GITHUB_STEP_SUMMARY"
+            run_gh pr create --base main --head "$IMPLEMENTATION_BRANCH" --title 'ImageBoost Pro: редактор и проверенная Windows-сборка' --body-file docs/PULL_REQUEST.md | tee -a "$GITHUB_STEP_SUMMARY"
           fi

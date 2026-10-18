@@ -76,6 +76,7 @@ class ControlsPanel(QScrollArea):
             self._number(f, key, label, 0, 100)
 
         f = self._category("Восстановление фотографии")
+        self._action(f, "Ретушь повреждений по маске…", "retouch")
         self._number(f, "deblur", "Уменьшение размытия, %", 0, 100)
         self._number(f, "jpeg_artifacts", "JPEG-артефакты, %", 0, 100)
         self._number(f, "banding_reduction", "Полосы на градиентах, %", 0, 100)

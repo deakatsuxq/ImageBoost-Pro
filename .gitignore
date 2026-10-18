@@ -12,4 +12,5 @@ dist/
 *.onnx
 .coverage
 htmlcov/
+reports/
 *.zip

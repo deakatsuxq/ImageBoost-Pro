@@ -115,6 +115,8 @@ class MainWindow(QMainWindow):
         edit_menu.addAction(self.redo_action)
         self._action("Вернуться к оригиналу", self.reset_settings, "Ctrl+R", edit_menu)
         self._action("Анализ качества", self.analyze_current, "Ctrl+I", edit_menu)
+        self.retouch_action = self._action("Ретушь повреждений по маске…", self.retouch_original,
+                                           "Ctrl+Shift+R", edit_menu)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
         left = QWidget()
@@ -643,7 +645,7 @@ class MainWindow(QMainWindow):
     def _control_action(self, action):
         actions = {"analyze": self.analyze_current, "auto_noise": lambda: self.apply_smart("balanced", True),
                    "reset": self.reset_settings, "export": self.export_current, "batch": self.export_batch,
-                   "why": self.explain_analysis}
+                   "why": self.explain_analysis, "retouch": self.retouch_original}
         if action.startswith("smart:"):
             self.apply_smart(action.split(":", 1)[1])
         elif action in actions:
@@ -652,6 +654,14 @@ class MainWindow(QMainWindow):
     def explain_analysis(self):
         if self.current_analysis is not None:
             QMessageBox.information(self, "Почему выбраны эти параметры?", self.analysis_text.toPlainText())
+
+    def retouch_original(self):
+        if self.current_document is None or self._active_task:
+            return
+        from imageboost_pro.ui.restoration_dialog import RestorationDialog
+        dialog = RestorationDialog(self.current_document, self.preferences, self)
+        if dialog.exec() == QDialog.DialogCode.Accepted and dialog.saved_path is not None:
+            self.load_paths([dialog.saved_path])
 
     def _apply_preset(self, index):
         preset = self.presets.itemData(index)
@@ -737,6 +747,7 @@ class MainWindow(QMainWindow):
         ready = self.current_document is not None and self._active_task is None
         busy = self._active_task is not None
         self.save_action.setEnabled(ready)
+        self.retouch_action.setEnabled(ready)
         self.improve_button.setEnabled(ready)
         self.undo_action.setEnabled(not busy and bool(self.current_state and self.current_state.can_undo))
         self.redo_action.setEnabled(not busy and bool(self.current_state and self.current_state.can_redo))
