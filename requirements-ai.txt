@@ -1,0 +1,4 @@
+# Optional genuine Real-ESRGAN inference. Python 3.11/3.12, Windows/Linux x64.
+# CPU Windows bundle: pip install -r requirements-ai.txt --index-url https://download.pytorch.org/whl/cpu
+# CUDA is optional: install the matching official PyTorch wheel for your NVIDIA driver.
+torch==2.7.1
